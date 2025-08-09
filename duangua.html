@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Game Đua Ngựa</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #4CAF50;
+    color: white;
+}
+#joinSection {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    z-index: 999;
+}
+.track {
+    width: 1200px;
+    height: 60px;
+    border: 2px solid #fff;
+    margin: 10px auto;
+    position: relative;
+    background: #388E3C;
+    overflow: hidden;
+}
+.horse {
+    position: absolute;
+    top: 5px;
+    left: 0;
+    width: 50px;
+    height: 50px;
+}
+.finish-line {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 10px;
+    height: 100%;
+    background: red;
+}
+.controls {
+    margin: 15px;
+}
+</style>
+</head>
+<body>
+<div id="joinSection">
+    <h1>Tham gia nhóm Telegram để chơi</h1>
+    <a href="https://t.me/htuanpremium0" target="_blank">
+        <button id="joinBtn" style="padding:15px 30px;font-size:20px;">Tham Gia</button>
+    </a>
+</div>
+<h1>🏇 Game Đua Ngựa</h1>
+<div class="controls">
+    Số dư: <span id="balance">10000</span> | 
+    Cược: <input type="number" id="betAmount" value="100" min="1"> |
+    Chọn ngựa: <select id="betHorse"></select>
+    <button id="startBtn">Bắt đầu</button>
+    <button id="resetBtn" disabled>Chơi lại</button>
+</div>
+<div id="tracks"></div>
+<h2 id="result"></h2>
+<script>
+let balance = 10000;
+let horses = [];
+let numHorses = 8;
+const minDuration = 15000;
+const maxDuration = 20000;
+const updateInterval = 30;
+const tracksEl = document.getElementById('tracks');
+const balanceEl = document.getElementById('balance');
+const betAmountEl = document.getElementById('betAmount');
+const betHorseEl = document.getElementById('betHorse');
+const resultEl = document.getElementById('result');
+const startBtn = document.getElementById('startBtn');
+const resetBtn = document.getElementById('resetBtn');
+const joinSection = document.getElementById('joinSection');
+const joinBtn = document.getElementById('joinBtn');
+
+for(let i=1; i<=numHorses; i++){
+    const track = document.createElement('div');
+    track.className = 'track';
+    const horse = document.createElement('img');
+    horse.src = 'horse.png';
+    horse.className = 'horse';
+    const finish = document.createElement('div');
+    finish.className = 'finish-line';
+    track.appendChild(horse);
+    track.appendChild(finish);
+    tracksEl.appendChild(track);
+    horses.push({el: horse, speed: 0, pos: 0});
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = 'Ngựa ' + i;
+    betHorseEl.appendChild(opt);
+}
+
+function updateBalanceDisplay(showAlert = true){
+    balanceEl.textContent = balance;
+    if(showAlert && balance <= 0){
+        alert("Bạn đã hết tiền!");
+    }
+}
+
+joinBtn.addEventListener('click', ()=>{
+    joinSection.style.display = 'none';
+});
+
+startBtn.addEventListener('click', ()=>{
+    const bet = parseInt(betAmountEl.value);
+    const betHorse = parseInt(betHorseEl.value);
+    if(bet > balance || bet <= 0){
+        alert("Cược không hợp lệ!");
+        return;
+    }
+    balance -= bet;
+    updateBalanceDisplay(false); // Không báo hết tiền khi vừa trừ cược
+    resultEl.textContent = '';
+    startBtn.disabled = true;
+    betAmountEl.disabled = true;
+    betHorseEl.disabled = true;
+    horses.forEach(h=> {h.el.style.left = '0px'; h.pos = 0;});
+    const laneWidth = tracksEl.querySelector('.track').clientWidth;
+    const finishX = laneWidth - 60;
+    let finished = [];
+
+    // Chọn thứ tự ngẫu nhiên
+    let order = Array.from({length: numHorses}, (_, i) => i);
+    order.sort(() => Math.random() - 0.5);
+
+    // Gán thời gian chạy
+    let durations = [];
+    for (let i = 0; i < numHorses; i++) {
+        durations.push(minDuration + Math.random() * (maxDuration - minDuration));
+    }
+    durations.sort((a,b) => a - b);
+
+    let horseDurations = [];
+    for (let i = 0; i < numHorses; i++) {
+        horseDurations[order[i]] = durations[i];
+    }
+
+    horses.forEach((h, idx) => {
+        let totalSteps = horseDurations[idx] / updateInterval;
+        h.speed = finishX / totalSteps;
+    });
+
+    let raceInterval = setInterval(()=>{
+        horses.forEach((h,i)=>{
+            if(finished.includes(i)) return;
+            h.pos += h.speed;
+            if(h.pos >= finishX){
+                h.pos = finishX;
+                finished.push(i);
+            }
+            h.el.style.transform = `translateX(${h.pos}px)`;
+        });
+
+        if(finished.length === numHorses){
+            clearInterval(raceInterval);
+            let top1 = finished[0]+1;
+            let top2 = finished[1]+1;
+            let top3 = finished[2]+1;
+            resultEl.textContent = `🏆 1st: Ngựa ${top1} (x4) | 2nd: Ngựa ${top2} (x3) | 3rd: Ngựa ${top3} (x2)`;
+            if(betHorse === top1) balance += bet*4;
+            else if(betHorse === top2) balance += bet*3;
+            else if(betHorse === top3) balance += bet*2;
+            updateBalanceDisplay(true); // Chỉ báo hết tiền khi kết thúc ván
+            startBtn.disabled = false;
+            resetBtn.disabled = false;
+            betAmountEl.disabled = false;
+            betHorseEl.disabled = false;
+        }
+    }, updateInterval);
+});
+
+resetBtn.addEventListener('click', ()=>{
+    horses.forEach(h=> {h.el.style.left = '0px'; h.pos = 0;});
+    resultEl.textContent = '';
+    resetBtn.disabled = true;
+});
+updateBalanceDisplay(false);
+</script>
+</body>
+</html>
